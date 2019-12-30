@@ -47,6 +47,7 @@ dependencies {
 
     // webRTC
     implementation 'org.webrtc:google-webrtc:1.0.22672'
+    //implementation 'org.webrtc:google-webrtc:1.0.21710'
     // using view model
     implementation 'androidx.lifecycle:lifecycle-extensions:2.1.0'
     // rx java

@@ -7,8 +7,10 @@ import androidx.lifecycle.ViewModelProviders;
 
 import android.Manifest;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 
+import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
 import org.webrtc.Camera1Enumerator;
 import org.webrtc.Camera2Enumerator;
@@ -22,6 +24,7 @@ import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SessionDescription;
+import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoRenderer;
 import org.webrtc.VideoSource;
@@ -51,7 +54,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     private PeerConnection mRemotePeerConnection;
     private VideoTrack mVideoTrackFromCamera;
     private AudioTrack mLocalAudioTrack;
-
+    private MediaConstraints mMediaConstraints;
     private EglBase mEglBase;
 
     //// OVERRIDE REGION
@@ -99,6 +102,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
         binding.activityMediaStreamLocalView.init(mEglBase.getEglBaseContext(), null);
         binding.activityMediaStreamLocalView.setEnableHardwareScaler(true);
+        //binding.activityMediaStreamLocalView.setZOrderMediaOverlay(true);
         binding.activityMediaStreamLocalView.setMirror(true);
 
         binding.activityMediaStreamRemotelView.init(mEglBase.getEglBaseContext(), null);
@@ -107,6 +111,8 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     }
 
     private void createVideoTrackFromCameraAndShowIt() {
+        mMediaConstraints = new MediaConstraints();
+
         VideoCapturer videoCapturer = createVideoCapturer();
         VideoSource videoSource = mPeerConnectionFactory.createVideoSource(videoCapturer);
 
@@ -115,6 +121,9 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         mVideoTrackFromCamera = mPeerConnectionFactory.createVideoTrack(VideoTransmissionParameters.VIDEO_TRACK_ID, videoSource);
         mVideoTrackFromCamera.setEnabled(true);
         mVideoTrackFromCamera.addSink(binding.activityMediaStreamLocalView);
+
+        AudioSource source = mPeerConnectionFactory.createAudioSource(mMediaConstraints);
+        mLocalAudioTrack = mPeerConnectionFactory.createAudioTrack(VideoTransmissionParameters.AUDIO_TRACK_ID, source);
     }
 
     private void createPeerConnectionFactory() {
@@ -134,6 +143,9 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 .setOptions(peerConnectionFactoryOptions)
                 .createPeerConnectionFactory();
 
+        mPeerConnectionFactory.setVideoHwAccelerationOptions(mEglBase.getEglBaseContext(), mEglBase.getEglBaseContext());
+
+
     }
 
     @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
@@ -143,7 +155,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         //iceServers.add(stunServerList);
 
         PeerConnection.RTCConfiguration rtcConfiguration = new PeerConnection.RTCConfiguration(iceServers);
-        // sdpConstraints.mandatory.add(new MediaConstraints.KeyValuePair("offerToReceiveAudio", "true"));
+        // mMediaConstraints.mandatory.add(new MediaConstraints.KeyValuePair("offerToReceiveAudio", "true"));
         mLocalPeerConnection = mPeerConnectionFactory.createPeerConnection(rtcConfiguration, new CustomPeerConnectionObserver() {
             @Override
             public void onIceCandidate(IceCandidate iceCandidate) {
@@ -171,12 +183,11 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             }
         });
 
-        MediaStream mediaStream = mPeerConnectionFactory.createLocalMediaStream("ARDAMS");
+        MediaStream mediaStream = mPeerConnectionFactory.createLocalMediaStream("007");
         mediaStream.addTrack(mVideoTrackFromCamera);
 
         mLocalPeerConnection.addStream(mediaStream);
 
-        MediaConstraints sdpConstraints = new MediaConstraints();
         mLocalPeerConnection.createOffer(new SimpleSdpObserver() {
             @Override
             public void onCreateSuccess(SessionDescription sessionDescription) {
@@ -199,7 +210,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                         super.onCreateFailure(s);
                         Log.d(TAG, "Error to create remote offer!");
                     }
-                }, sdpConstraints);
+                }, mMediaConstraints);
             }
 
             @Override
@@ -207,7 +218,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 super.onCreateFailure(s);
                 Log.d(TAG, "Error to create local offer!");
             }
-        }, sdpConstraints);
+        }, mMediaConstraints);
 
 
     }
@@ -225,7 +236,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     }
 
     private VideoCapturer createVideoCapturer() {
-        VideoCapturer videoCapturer = null;
+        VideoCapturer videoCapturer;
         if (useCamera2()) {
             videoCapturer = createCameraCapturer(new Camera2Enumerator(this));
         } else {
@@ -243,7 +254,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
         // Trying to find main camera
         for (String deviceName : deviceNames) {
-            if (!enumerator.isFrontFacing(deviceName)) {
+            if (enumerator.isFrontFacing(deviceName)) {
                 VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
                 if (videoCapturer != null) {
                     return videoCapturer;
@@ -253,7 +264,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
         // Trying to find a front facing camera!
         for (String deviceName : deviceNames) {
-            if (enumerator.isFrontFacing(deviceName)) {
+            if (!enumerator.isFrontFacing(deviceName)) {
                 VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
 
                 if (videoCapturer != null) {

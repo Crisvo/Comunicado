@@ -7,7 +7,7 @@ package ro.atm.proiectretele.utils.webrtc;
  * */
 public class VideoTransmissionParameters {
     // IDS
-    public static final String VIDEO_TRACK_ID = "ARDAMSv0";
+    public static final String VIDEO_TRACK_ID = "007";
     public static final String AUDIO_TRACK_ID = "ARDAMSa0";
     // HD resolution
     public static final int HD_VIDEO_HEIGHT = 1280;
