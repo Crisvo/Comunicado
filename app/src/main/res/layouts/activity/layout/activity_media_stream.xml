@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout>
+
+    <data>
+
+        <variable
+            name="viewModel"
+            type="ro.atm.proiectretele.viewmodel.MediaStreamViewModel" />
+    </data>
+
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        tools:context=".view.activities.MediaStreamActivity">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Local view:"
+            android:textColor="#000000"
+            android:textSize="20sp" />
+
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/activity_media_stream_localView"
+            android:layout_width="match_parent"
+            android:layout_height="300dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Remote view:"
+            android:textColor="#000000"
+            android:textSize="20sp" />
+
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/activity_media_stream_remotelView"
+            android:layout_width="match_parent"
+            android:layout_height="300dp" />
+    </LinearLayout>
+</layout>
