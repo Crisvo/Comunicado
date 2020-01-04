@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModelProviders;
 
 import android.Manifest;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 
 import org.webrtc.AudioSource;
@@ -24,9 +23,7 @@ import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SessionDescription;
-import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.VideoCapturer;
-import org.webrtc.VideoRenderer;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 
@@ -37,7 +34,7 @@ import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 import ro.atm.proiectretele.R;
 import ro.atm.proiectretele.databinding.ActivityMediaStreamBinding;
-import ro.atm.proiectretele.utils.app.Constants_Permissions;
+import ro.atm.proiectretele.utils.app.Constants.Constants_Permissions;
 import ro.atm.proiectretele.utils.webrtc.CustomPeerConnectionObserver;
 import ro.atm.proiectretele.utils.webrtc.SimpleSdpObserver;
 import ro.atm.proiectretele.utils.webrtc.VideoTransmissionParameters;
@@ -52,8 +49,12 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     private PeerConnectionFactory mPeerConnectionFactory;
     private PeerConnection mLocalPeerConnection;
     private PeerConnection mRemotePeerConnection;
+    private SimpleSdpObserver mLocalSdp;
+    private SimpleSdpObserver mRemoteSdp;
+
     private VideoTrack mVideoTrackFromCamera;
     private AudioTrack mLocalAudioTrack;
+
     private MediaConstraints mMediaConstraints;
     private EglBase mEglBase;
 
@@ -72,7 +73,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         createPeerConnectionFactory();
         createVideoTrackFromCameraAndShowIt();
 
-        //call();
+        P2Pcall();
 
     }
 
@@ -102,11 +103,12 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
         binding.activityMediaStreamLocalView.init(mEglBase.getEglBaseContext(), null);
         binding.activityMediaStreamLocalView.setEnableHardwareScaler(true);
-        //binding.activityMediaStreamLocalView.setZOrderMediaOverlay(true);
+        binding.activityMediaStreamLocalView.setZOrderMediaOverlay(true);
         binding.activityMediaStreamLocalView.setMirror(true);
 
         binding.activityMediaStreamRemotelView.init(mEglBase.getEglBaseContext(), null);
         binding.activityMediaStreamRemotelView.setEnableHardwareScaler(true);
+        binding.activityMediaStreamLocalView.setZOrderMediaOverlay(true);
         binding.activityMediaStreamRemotelView.setMirror(true);
     }
 
@@ -144,12 +146,10 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 .createPeerConnectionFactory();
 
         mPeerConnectionFactory.setVideoHwAccelerationOptions(mEglBase.getEglBaseContext(), mEglBase.getEglBaseContext());
-
-
     }
 
     @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
-    public void call() {
+    public void P2Pcall() {
         List<PeerConnection.IceServer> iceServers = new ArrayList<>();
         //PeerConnection.IceServer stunServerList = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
         //iceServers.add(stunServerList);
@@ -161,7 +161,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             public void onIceCandidate(IceCandidate iceCandidate) {
                 super.onIceCandidate(iceCandidate);
                 Log.d(TAG, "onIceCandidate: local");
-                mLocalPeerConnection.addIceCandidate(iceCandidate);
+                mRemotePeerConnection.addIceCandidate(iceCandidate);
             }
         });
 
@@ -170,7 +170,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             public void onIceCandidate(IceCandidate iceCandidate) {
                 super.onIceCandidate(iceCandidate);
                 Log.d(TAG, "onIceCandidate: remote");
-                mRemotePeerConnection.addIceCandidate(iceCandidate);
+                mLocalPeerConnection.addIceCandidate(iceCandidate);
             }
 
             @Override
@@ -220,6 +220,16 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             }
         }, mMediaConstraints);
 
+
+    }
+
+    @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
+    private void doCall(){
+
+    }
+
+    @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
+    private void doAnswer(){
 
     }
 

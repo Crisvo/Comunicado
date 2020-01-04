@@ -6,7 +6,7 @@ import org.webrtc.SdpObserver;
 import org.webrtc.SessionDescription;
 
 /**
- * @author Cristian VOICU*/
+ * */
 public class SimpleSdpObserver implements SdpObserver {
     private static final String TAG = "SdpObserver";
 

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+    <data>
+        <variable
+            name="viewModel"
+            type="ro.atm.proiectretele.viewmodel.SignupViewModel" />
+    </data>
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context=".view.activities.SignupActivity">
+
+        <EditText
+            android:id="@+id/activity_signup_email"
+            android:layout_width="300dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="200dp"
+            android:hint="E-mail..."
+            android:inputType="textEmailAddress"
+            android:text="@={viewModel.signUpForm.sUeMail}"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <EditText
+            android:id="@+id/activity_signup_password"
+            android:layout_width="300dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:hint="Password..."
+            android:inputType="textPassword"
+            android:text="@={viewModel.signUpForm.sUpassword}"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/activity_signup_email" />
+
+        <EditText
+            android:id="@+id/activity_signup_username"
+            android:layout_width="300dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:hint="Username..."
+            android:text="@={viewModel.signUpForm.sUusername}"
+            app:layout_constraintBottom_toTopOf="@+id/activity_signup_email"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.504"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <Button
+            android:id="@+id/activity_signup_createAccount"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="140dp"
+            android:onClick="onSignUp"
+            android:text="Create account"
+            android:textAllCaps="false"
+            android:textSize="18sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/activity_signup_password"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</layout>

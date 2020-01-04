@@ -26,7 +26,7 @@
         <org.webrtc.SurfaceViewRenderer
             android:id="@+id/activity_media_stream_localView"
             android:layout_width="match_parent"
-            android:layout_height="300dp" />
+            android:layout_height="250dp" />
 
         <TextView
             android:layout_width="match_parent"
@@ -38,6 +38,6 @@
         <org.webrtc.SurfaceViewRenderer
             android:id="@+id/activity_media_stream_remotelView"
             android:layout_width="match_parent"
-            android:layout_height="300dp" />
+            android:layout_height="250dp" />
     </LinearLayout>
 </layout>

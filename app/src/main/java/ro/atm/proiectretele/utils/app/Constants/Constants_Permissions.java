@@ -1,4 +1,4 @@
-package ro.atm.proiectretele.utils.app;
+package ro.atm.proiectretele.utils.app.Constants;
 
 import java.util.jar.Manifest;
 

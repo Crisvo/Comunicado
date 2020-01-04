@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "570103210945",
+    "firebase_url": "https://comunicado-c21ba.firebaseio.com",
+    "project_id": "comunicado-c21ba",
+    "storage_bucket": "comunicado-c21ba.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:570103210945:android:05fdcb2b604de891e78540",
+        "android_client_info": {
+          "package_name": "ro.atm.proiectretele"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "570103210945-eaj925406qqducfp7mvjje779g4ern4n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuyXKPt2EYKxLJA0HqnIo1XRMdpSq4BXA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "570103210945-eaj925406qqducfp7mvjje779g4ern4n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
