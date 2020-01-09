@@ -52,6 +52,7 @@ public class LogInActivity extends AppCompatActivity {
             LogedInUser logedInUser = LogedInUser.getInstance(user.getUid(), user.getEmail(), user.getDisplayName());
             CloudFirestoreRepository repo = CloudFirestoreRepository.create();
             repo.addUser(new UserModel(logedInUser));
+            repo.onUserLogedIn();
             Log.d(TAG, "Login success");
             Intent intent = new Intent(LogInActivity.this, MainActivity.class);
             startActivity(intent);

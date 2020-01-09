@@ -1,7 +1,6 @@
 package ro.atm.proiectretele.view.activities;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProviders;
@@ -13,21 +12,13 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Toast;
 
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.EventListener;
-import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QuerySnapshot;
-
-import java.util.List;
 
 import ro.atm.proiectretele.R;
 import ro.atm.proiectretele.adapters.UserAdapter;
@@ -70,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
         binding.activityMainUsers.setLayoutManager(new LinearLayoutManager(this));
         binding.activityMainUsers.setAdapter(mAdapter);
 
-        Testing();
+       // Testing();
 
         mAdapter.setOnItemClickListener(new UserAdapter.OnItemClickListener() {
             @Override
@@ -78,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
                 UserModel userModel = documentSnapshot.toObject(UserModel.class);
                 String id = documentSnapshot.getId();
                 String path = documentSnapshot.getReference().getPath();
-                Toast.makeText(MainActivity.this, "POS: " + position + " ID: " + id, Toast.LENGTH_SHORT).show();
+                binding.activityMainSelectedUser.setText(userModel.getEmail());
             }
         });
     }
@@ -87,18 +78,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         mAdapter.startListening(); // cand aplicatia revine din backgroud, adaptorul incepe sa asculte din nou
-        noteRef.addSnapshotListener(this, new EventListener<DocumentSnapshot>() {
-            @Override
-            public void onEvent(@Nullable DocumentSnapshot documentSnapshot, @Nullable FirebaseFirestoreException e) {
-                if(e != null)
-                    return;
 
-                if(documentSnapshot.exists()){
-                    String str = documentSnapshot.getString("messagess"); //null if not exist
-                    binding.activityMainEt.setText(str);
-                }
-            }
-        });
     }
 
     @Override
@@ -135,7 +115,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //// METHODS
-    public void Testing(){
+    /*public void Testing(){
         FirebaseFirestore.getInstance()
                 .collection(Constants.COLLECTION_ONLINE_USERS)
                 .get()
@@ -151,7 +131,7 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                 });
-    }
+    }*/
 
     public void onButton(View view){
 

@@ -6,6 +6,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 
+import com.firebase.ui.auth.data.model.User;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
@@ -17,6 +18,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import ro.atm.proiectretele.data.CloudFirestoreRepository;
+import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.utils.app.signup.SignupForm;
 
 public class SignupViewModel extends AndroidViewModel {
@@ -36,6 +39,8 @@ public class SignupViewModel extends AndroidViewModel {
         mAuth.createUserWithEmailAndPassword(mSignUpForm.getSUeMail(), mSignUpForm.getSUpassword()).addOnCompleteListener(task -> {
             if(task.isSuccessful()){
                 returnVal.set(true);
+                UserModel user = new UserModel("uid", mSignUpForm.getSUeMail(), mSignUpForm.getSUusername());
+                CloudFirestoreRepository.create().onUserSignUp(user);
             }
         });
         return returnVal.get();

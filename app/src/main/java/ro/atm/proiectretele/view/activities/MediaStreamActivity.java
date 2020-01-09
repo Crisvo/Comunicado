@@ -40,8 +40,10 @@ import java.util.List;
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 import ro.atm.proiectretele.R;
+import ro.atm.proiectretele.data.Constants;
 import ro.atm.proiectretele.databinding.ActivityMediaStreamBinding;
 import ro.atm.proiectretele.utils.app.constant.Constants_Permissions;
+import ro.atm.proiectretele.utils.app.login.LogedInUser;
 import ro.atm.proiectretele.utils.webrtc.CustomPeerConnectionObserver;
 import ro.atm.proiectretele.utils.webrtc.SignallingClient;
 import ro.atm.proiectretele.utils.webrtc.SimpleSdpObserver;
@@ -67,7 +69,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     private EglBase mEglBase;
 
     private FirebaseFirestore mDatabase = FirebaseFirestore.getInstance();
-    private DocumentReference noteRef = mDatabase.document("user-com/sig-client");
+    private DocumentReference noteRef = mDatabase.collection(Constants.COLLECTION_COMMUNICATE).document(LogedInUser.getInstance().getEmail());
     //// OVERRIDE REGION
 
     @Override
@@ -119,9 +121,11 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                     str = documentSnapshot.getString("candidate"); //null if not exist
                     if (str != null) { // is ice candidate
                         //remote ice candidate received
-                        mLocalPeerConnection.addIceCandidate(new IceCandidate(documentSnapshot.getString("id"),
-                                Integer.parseInt(documentSnapshot.getString("label")),
-                                documentSnapshot.getString("candidate")));
+                        String candidate = documentSnapshot.getString("candidate");
+                        String id = documentSnapshot.getString("id");
+                        Integer label = documentSnapshot.getLong("label").intValue();
+                        String type = documentSnapshot.getString("type");
+                        mLocalPeerConnection.addIceCandidate(new IceCandidate(id, label, candidate));
                     }
                     str = documentSnapshot.getString("message");
                     if (str != null) { // is a message
@@ -308,7 +312,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 Log.d(TAG, "onCreateSuccess local");
                 mLocalPeerConnection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
                 mRemotePeerConnection.setRemoteDescription(new SimpleSdpObserver(), sessionDescription);
-                //SignallingClient.getInstance().emitMessage(sessionDescription);
+                SignallingClient.getInstance().emitMessage(sessionDescription);
                 mRemotePeerConnection.createAnswer(new SimpleSdpObserver() {
                     @Override
                     public void onCreateSuccess(SessionDescription sessionDescription) {

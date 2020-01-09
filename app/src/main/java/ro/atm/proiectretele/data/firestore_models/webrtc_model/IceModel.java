@@ -16,7 +16,7 @@ public class IceModel {
     /**
      * iceCandidate.sdpMLineIndex
      */
-    private String mLabel;
+    private Integer mLabel;
     /**
      * It is ice candidate sdp, candidate is the name in javascript
      */
@@ -27,7 +27,7 @@ public class IceModel {
         // empty constructor needed
     }
 
-    public IceModel(String type, String id, String label, String candidate) {
+    public IceModel(String type, String id, Integer label, String candidate) {
         mType = type;
         mId = id;
         mLabel = label;
@@ -43,7 +43,7 @@ public class IceModel {
         return mId;
     }
 
-    public String getLabel() {
+    public Integer getLabel() {
         return mLabel;
     }
 

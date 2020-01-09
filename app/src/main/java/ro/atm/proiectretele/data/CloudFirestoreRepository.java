@@ -2,9 +2,11 @@ package ro.atm.proiectretele.data;
 
 import android.util.Log;
 
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import ro.atm.proiectretele.data.firestore_models.UserModel;
+import ro.atm.proiectretele.utils.app.login.LogedInUser;
 
 /**
  * Class that works with cloud firestore database
@@ -13,6 +15,9 @@ import ro.atm.proiectretele.data.firestore_models.UserModel;
 public class CloudFirestoreRepository {
     private static CloudFirestoreRepository INSTANCE = new CloudFirestoreRepository();
     FirebaseFirestore database = FirebaseFirestore.getInstance();
+
+    CollectionReference usersReference = database.collection(Constants.COLLECTION_ALL_USERS);
+    CollectionReference userCommunicationReference = database.collection(Constants.COLLECTION_COMMUNICATE);
     //// MEMBERS
     private String TAG = "FirebaseDatabase";
 
@@ -35,13 +40,21 @@ public class CloudFirestoreRepository {
                 .addOnSuccessListener(aVoid -> Log.d(TAG, "Online userModel added successfully!"))
                 .addOnFailureListener(e -> Log.d(TAG, "Failed to add online userModel!"));
     }
-    public void onUserSignOut(UserModel userModel){
+
+    public void onUserSignOut(UserModel userModel) {
         database.collection(Constants.COLLECTION_ONLINE_USERS).document(userModel.getUid()).delete();
     }
 
-    public void testDB(Object object){
-        database.collection(Constants.COLLECTION_COMMUNICATE).document(Constants.DOCUMENT_GENERAL_COM).set(object)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "Online user added successfully!"))
-                .addOnFailureListener(e -> Log.d(TAG, "Failed to add online user!"));
+    public void onUserSignUp(UserModel user) {
+        usersReference.document(user.getEmail()).set(user)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "User added successfully! on signup"))
+                .addOnFailureListener(e -> Log.d(TAG, "Failed to add user! on signup"));
+    }
+
+    public void onUserLogedIn() {
+        LogedInUser user = LogedInUser.getInstance();
+        if (user != null) {
+            userCommunicationReference.document(user.getEmail()).set(new UserModel(user));
+        }
     }
 }
