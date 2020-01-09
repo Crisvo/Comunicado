@@ -1,33 +1,22 @@
 package ro.atm.proiectretele.view.activities;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
-import androidx.lifecycle.LifecycleOwner;
-import androidx.lifecycle.ViewModelProvider;
 import androidx.lifecycle.ViewModelProviders;
 
 import android.content.Intent;
-import android.net.wifi.hotspot2.pps.Credential;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
-import com.google.firebase.FirebaseException;
-import com.google.firebase.FirebaseTooManyRequestsException;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.auth.PhoneAuthCredential;
-import com.google.firebase.auth.PhoneAuthProvider;
-
-import java.util.concurrent.TimeUnit;
 
 import ro.atm.proiectretele.R;
+import ro.atm.proiectretele.data.CloudFirestoreRepository;
+import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityLogInBinding;
+import ro.atm.proiectretele.utils.app.login.LogedInUser;
 import ro.atm.proiectretele.viewmodel.LogInViewModel;
 
 public class LogInActivity extends AppCompatActivity {
@@ -60,8 +49,11 @@ public class LogInActivity extends AppCompatActivity {
 
         FirebaseUser user = mViewModel.getUser();
         if(user != null){ // user si auth
+            LogedInUser logedInUser = LogedInUser.getInstance(user.getUid(), user.getEmail(), user.getDisplayName());
+            CloudFirestoreRepository repo = CloudFirestoreRepository.create();
+            repo.addUser(new UserModel(logedInUser));
             Log.d(TAG, "Login success");
-            Intent intent = new Intent(LogInActivity.this, MediaStreamActivity.class);
+            Intent intent = new Intent(LogInActivity.this, MainActivity.class);
             startActivity(intent);
         }else{
             Log.d(TAG, "Login error!");

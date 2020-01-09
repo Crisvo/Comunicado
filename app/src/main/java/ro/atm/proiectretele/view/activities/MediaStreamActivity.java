@@ -1,6 +1,7 @@
 package ro.atm.proiectretele.view.activities;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProviders;
@@ -8,6 +9,12 @@ import androidx.lifecycle.ViewModelProviders;
 import android.Manifest;
 import android.os.Bundle;
 import android.util.Log;
+
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.EventListener;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
@@ -34,8 +41,9 @@ import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 import ro.atm.proiectretele.R;
 import ro.atm.proiectretele.databinding.ActivityMediaStreamBinding;
-import ro.atm.proiectretele.utils.app.Constants.Constants_Permissions;
+import ro.atm.proiectretele.utils.app.constant.Constants_Permissions;
 import ro.atm.proiectretele.utils.webrtc.CustomPeerConnectionObserver;
+import ro.atm.proiectretele.utils.webrtc.SignallingClient;
 import ro.atm.proiectretele.utils.webrtc.SimpleSdpObserver;
 import ro.atm.proiectretele.utils.webrtc.VideoTransmissionParameters;
 import ro.atm.proiectretele.viewmodel.MediaStreamViewModel;
@@ -58,6 +66,8 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     private MediaConstraints mMediaConstraints;
     private EglBase mEglBase;
 
+    private FirebaseFirestore mDatabase = FirebaseFirestore.getInstance();
+    private DocumentReference noteRef = mDatabase.document("user-com/sig-client");
     //// OVERRIDE REGION
 
     @Override
@@ -94,6 +104,37 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         // Forward results to EasyPermissions
         EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        noteRef.addSnapshotListener(this, new EventListener<DocumentSnapshot>() {
+            @Override
+            public void onEvent(@Nullable DocumentSnapshot documentSnapshot, @Nullable FirebaseFirestoreException e) {
+                if (e != null)
+                    return;
+                String str;
+                if (documentSnapshot.exists()) {
+                    str = documentSnapshot.getString("candidate"); //null if not exist
+                    if (str != null) { // is ice candidate
+                        //remote ice candidate received
+                        mLocalPeerConnection.addIceCandidate(new IceCandidate(documentSnapshot.getString("id"),
+                                Integer.parseInt(documentSnapshot.getString("label")),
+                                documentSnapshot.getString("candidate")));
+                    }
+                    str = documentSnapshot.getString("message");
+                    if (str != null) { // is a message
+
+                    }
+                    str = documentSnapshot.getString("sdp");
+                    if (str != null) { // is a sdp
+                        mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(),
+                                new SessionDescription(SessionDescription.Type.fromCanonicalForm(documentSnapshot.getString("type").toLowerCase()), documentSnapshot.getString("sdp")));
+                    }
+                }
+            }
+        });
     }
 
     //// METHODS REGION
@@ -148,11 +189,82 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         mPeerConnectionFactory.setVideoHwAccelerationOptions(mEglBase.getEglBaseContext(), mEglBase.getEglBaseContext());
     }
 
+    /**
+     * Creating local peer connection instance
+     */
+    private void createPeerConnection() {
+        List<PeerConnection.IceServer> iceServers = new ArrayList<>();
+        PeerConnection.IceServer stunServerList = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
+        iceServers.add(stunServerList);
+
+        PeerConnection.RTCConfiguration rtcConfiguration = new PeerConnection.RTCConfiguration(iceServers);
+
+        rtcConfiguration.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.DISABLED;
+        rtcConfiguration.bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE;
+        rtcConfiguration.rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE;
+        rtcConfiguration.continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY;
+        // Use ECDSA encryption.
+        rtcConfiguration.keyType = PeerConnection.KeyType.ECDSA;
+
+        mLocalPeerConnection = mPeerConnectionFactory.createPeerConnection(rtcConfiguration, new CustomPeerConnectionObserver() {
+            @Override
+            public void onIceCandidate(IceCandidate iceCandidate) {
+                super.onIceCandidate(iceCandidate);
+                Log.d(TAG, "onIceCandidate: local");
+                //mRemotePeerConnection.addIceCandidate(iceCandidate);
+                SignallingClient.getInstance().emitIceCandidate(iceCandidate);
+                // send to remote peer connection
+            }
+
+            @Override
+            public void onAddStream(MediaStream mediaStream) {
+                super.onAddStream(mediaStream);
+                Log.d(TAG, "onAddStream: local");
+                VideoTrack remoteVideoTrack = mediaStream.videoTracks.get(0);
+                remoteVideoTrack.setEnabled(true);
+                remoteVideoTrack.addSink(binding.activityMediaStreamRemotelView);
+            }
+        });
+
+    }
+
+    @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
+    private void doCall() {
+        mMediaConstraints.mandatory.add(
+                new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
+        mMediaConstraints.mandatory.add(new MediaConstraints.KeyValuePair(
+                "OfferToReceiveVideo", "true"));
+        mLocalPeerConnection.createOffer(new SimpleSdpObserver() {
+            @Override
+            public void onCreateSuccess(SessionDescription sessionDescription) {
+                super.onCreateSuccess(sessionDescription);
+                mLocalPeerConnection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
+                Log.d("onCreateSuccess", "SignallingClient emit ");
+                SignallingClient.getInstance().emitMessage(sessionDescription);
+                // send sdp to the other peer
+
+            }
+        }, mMediaConstraints);
+    }
+
+    @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
+    private void doAnswer() {
+        mLocalPeerConnection.createAnswer(new SimpleSdpObserver() {
+            @Override
+            public void onCreateSuccess(SessionDescription sessionDescription) {
+                super.onCreateSuccess(sessionDescription);
+                mLocalPeerConnection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
+                SignallingClient.getInstance().emitMessage(sessionDescription);
+                // send sdp to the other peer
+            }
+        }, new MediaConstraints());
+    }
+
     @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
     public void P2Pcall() {
         List<PeerConnection.IceServer> iceServers = new ArrayList<>();
-        //PeerConnection.IceServer stunServerList = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
-        //iceServers.add(stunServerList);
+        PeerConnection.IceServer stunServerList = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
+        iceServers.add(stunServerList);
 
         PeerConnection.RTCConfiguration rtcConfiguration = new PeerConnection.RTCConfiguration(iceServers);
         // mMediaConstraints.mandatory.add(new MediaConstraints.KeyValuePair("offerToReceiveAudio", "true"));
@@ -161,6 +273,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             public void onIceCandidate(IceCandidate iceCandidate) {
                 super.onIceCandidate(iceCandidate);
                 Log.d(TAG, "onIceCandidate: local");
+                SignallingClient.getInstance().emitIceCandidate(iceCandidate);
                 mRemotePeerConnection.addIceCandidate(iceCandidate);
             }
         });
@@ -195,7 +308,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 Log.d(TAG, "onCreateSuccess local");
                 mLocalPeerConnection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
                 mRemotePeerConnection.setRemoteDescription(new SimpleSdpObserver(), sessionDescription);
-
+                //SignallingClient.getInstance().emitMessage(sessionDescription);
                 mRemotePeerConnection.createAnswer(new SimpleSdpObserver() {
                     @Override
                     public void onCreateSuccess(SessionDescription sessionDescription) {
@@ -222,17 +335,6 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
 
     }
-
-    @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
-    private void doCall(){
-
-    }
-
-    @AfterPermissionGranted(Constants_Permissions.RC_WEBRTC)
-    private void doAnswer(){
-
-    }
-
 
     private void requestPermission() {
         String[] perms = {Manifest.permission.CAMERA, Manifest.permission.INTERNET, Manifest.permission.ACCESS_NETWORK_STATE,

@@ -1,6 +1,4 @@
-package ro.atm.proiectretele.utils.app.Constants;
-
-import java.util.jar.Manifest;
+package ro.atm.proiectretele.utils.app.constant;
 
 /** Static class for permission codes*/
 public class Constants_Permissions {
