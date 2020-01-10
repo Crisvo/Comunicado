@@ -17,6 +17,7 @@ import ro.atm.proiectretele.data.CloudFirestoreRepository;
 import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityLogInBinding;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
+import ro.atm.proiectretele.utils.webrtc.SignallingClient;
 import ro.atm.proiectretele.viewmodel.LogInViewModel;
 
 public class LogInActivity extends AppCompatActivity {

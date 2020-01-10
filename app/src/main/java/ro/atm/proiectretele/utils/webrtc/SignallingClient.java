@@ -1,13 +1,11 @@
 package ro.atm.proiectretele.utils.webrtc;
 
+import android.content.Intent;
 import android.util.Log;
 
-import com.firebase.ui.firestore.paging.FirestoreDataSource;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.FirebaseFirestore;
 
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.webrtc.IceCandidate;
 import org.webrtc.SessionDescription;
 
@@ -17,65 +15,85 @@ import java.util.Map;
 /**
  * TODO: add a description here
  * Singleton class
+ *
  * @author Cristian VOICU
  * @version 1.0
  */
 public class SignallingClient {
-
-    private static SignallingClient INSTANCE = new SignallingClient();
-    private FirebaseFirestore database = FirebaseFirestore.getInstance();
-    private DocumentReference noteRef = database.document("user-com/sig-client");
-    private Map<String, Object> comMap;
-
     //// MEMBERS
     private String TAG = "SignalingClient";
 
-    private SignallingClient(){
+    //region Constructor region
+    private static SignallingClient INSTANCE = new SignallingClient();
+    public boolean isInitiator = false;
+    public boolean isStarted = false;
+    public boolean hasPandingOffer = false;
+    private DocumentReference noteRef = null;
+    private CollectionReference colRef = null;
+    private Map<String, Object> comMap;
+    private int iceNr;
+    private boolean isChannelReady = false;
+
+    private SignallingClient() {
 
     }
-    //// CONSTRUCTOR
-    public static SignallingClient getInstance(){
-        if(INSTANCE == null){
+
+    public static SignallingClient getInstance() {
+        if (INSTANCE == null) {
             INSTANCE = new SignallingClient();
         }
         return INSTANCE;
     }
 
-    //// METHODS
-    private void emitInitStatement(String message) {
-        Log.d("SignallingClient", "emitInitStatement() called with: event = [" + "create or join" + "], message = [" + message + "]");
-       // socket.emit("create or join", message);
-        comMap = new HashMap<>();
-        comMap.put("create or join", message);
-        noteRef.set(comMap);
-    }
-
-    public void emitMessage(String message) {
-        Log.d("SignallingClient", "emitMessage() called with: message = [" + message + "]");
-        //socket.emit("message", message);
-        comMap = new HashMap<>();
-        comMap.put("message", message);
-        noteRef.set(comMap);
-    }
+    //endregion
 
     public void emitMessage(SessionDescription message) {
-            Log.d("SignallingClient", "emitMessage() called with: message = [" + message + "]");
-            comMap = new HashMap<>();
-            comMap.put("type", message.type.canonicalForm());
-            comMap.put("sdp", message.description);
-            //socket.emit("message", obj);
-            noteRef.set(comMap);
+        Log.d("SignallingClient", "emitMessage() called with: message = [" + message + "]");
+        comMap = new HashMap<>();
+        comMap.put("type", message.type.canonicalForm());
+        comMap.put("sdp", message.description);
+        //noteRef.set(comMap);
+        colRef.document("sdp").set(comMap);
     }
 
 
     public void emitIceCandidate(IceCandidate iceCandidate) {
-            //socket.emit("message", object);
-            comMap = new HashMap<>();
-            comMap.put("type", "candidate");
-            comMap.put("label", iceCandidate.sdpMLineIndex);
-            comMap.put("id", iceCandidate.sdpMid);
-            comMap.put("candidate", iceCandidate.sdp);
-            noteRef.set(comMap);
+        comMap = new HashMap<>();
+        comMap.put("type", "candidate");
+        comMap.put("label", iceCandidate.sdpMLineIndex);
+        comMap.put("id", iceCandidate.sdpMid);
+        comMap.put("candidate", iceCandidate.sdp);
+        colRef.document(Integer.toString(iceNr)).set(comMap);
+        iceNr ++;
+        //noteRef.set(comMap);
 
+    }
+
+    /**
+     * Sets collection where i send data.
+     */
+    public void setDatabaseReference(CollectionReference reference) {
+        if (reference != null) {
+            colRef = reference;
+            isChannelReady = true;
+        }
+    }
+
+    public boolean getChannelState() {
+        return isChannelReady;
+    }
+
+    public int getIceNr(){
+        return iceNr;
+    }
+
+    public void doRefresh() {
+        iceNr = 0;
+        noteRef = null;
+        colRef = null;
+        isStarted = false;
+        isChannelReady = false;
+        isInitiator = false;
+        hasPandingOffer = false;
     }
 }

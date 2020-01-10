@@ -8,13 +8,21 @@ import androidx.lifecycle.ViewModelProviders;
 
 import android.Manifest;
 import android.os.Bundle;
+import android.os.UserManager;
 import android.util.Log;
 
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
@@ -36,11 +44,13 @@ import org.webrtc.VideoTrack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
 import ro.atm.proiectretele.R;
 import ro.atm.proiectretele.data.Constants;
+import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityMediaStreamBinding;
 import ro.atm.proiectretele.utils.app.constant.Constants_Permissions;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
@@ -52,7 +62,7 @@ import ro.atm.proiectretele.viewmodel.MediaStreamViewModel;
 
 public class MediaStreamActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks {
     private static final String TAG = "MediaStreamActivity";
-    //// MEMBERS REGION
+    //region Members
     private ActivityMediaStreamBinding binding;
     private MediaStreamViewModel mViewModel;
 
@@ -69,8 +79,15 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     private EglBase mEglBase;
 
     private FirebaseFirestore mDatabase = FirebaseFirestore.getInstance();
-    private DocumentReference noteRef = mDatabase.collection(Constants.COLLECTION_COMMUNICATE).document(LogedInUser.getInstance().getEmail());
-    //// OVERRIDE REGION
+    private DocumentReference sdpRef = mDatabase.collection(LogedInUser.getInstance().getEmail()).document(Constants.DOCUMENT_SDP);
+    private CollectionReference colRef = mDatabase.collection(LogedInUser.getInstance().getEmail());
+    //endregion
+
+    @Override
+    public void onBackPressed() {
+
+        super.onBackPressed();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,10 +102,12 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         createPeerConnectionFactory();
         createVideoTrackFromCameraAndShowIt();
 
-        P2Pcall();
+        //P2Pcall();
+        onConnectionStart();
 
     }
 
+    //region Permissions
     @Override
     public void onPermissionsGranted(int requestCode, @NonNull List<String> perms) {
         // Some permissions have been granted
@@ -108,41 +127,71 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
     }
 
+    private void requestPermission() {
+        String[] perms = {Manifest.permission.CAMERA, Manifest.permission.INTERNET, Manifest.permission.ACCESS_NETWORK_STATE,
+                Manifest.permission.CHANGE_NETWORK_STATE, Manifest.permission.RECORD_AUDIO, Manifest.permission.MODIFY_AUDIO_SETTINGS,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE};
+
+        if (!EasyPermissions.hasPermissions(this, perms)) {
+            EasyPermissions.requestPermissions(this, "rationale", Constants_Permissions.RC_WEBRTC, perms);
+        }
+
+    }
+//endregion
+
     @Override
     protected void onStart() {
         super.onStart();
-        noteRef.addSnapshotListener(this, new EventListener<DocumentSnapshot>() {
+        colRef.addSnapshotListener(this, new EventListener<QuerySnapshot>() {
+            @Override
+            public void onEvent(@Nullable QuerySnapshot queryDocumentSnapshots, @Nullable FirebaseFirestoreException e) {
+                if (e != null) {
+                    return;
+                }
+
+                for (QueryDocumentSnapshot documentSnapshot : queryDocumentSnapshots) {
+                    String docId = documentSnapshot.getId();
+                    if (!docId.equals(Constants.DOCUMENT_SDP) && !docId.equals(Constants.DOCUMENT_FROM)) {
+                        String candidate = documentSnapshot.getString("candidate");
+                        String id = documentSnapshot.getString("id");
+                        int label = Objects.requireNonNull(documentSnapshot.getLong("label")).intValue();
+                        String type = documentSnapshot.getString("type");
+                        mLocalPeerConnection.addIceCandidate(new IceCandidate(id, label, candidate));
+                    }
+                }
+            }
+        });
+        sdpRef.addSnapshotListener(this, new EventListener<DocumentSnapshot>() {
             @Override
             public void onEvent(@Nullable DocumentSnapshot documentSnapshot, @Nullable FirebaseFirestoreException e) {
                 if (e != null)
                     return;
                 String str;
                 if (documentSnapshot.exists()) {
-                    str = documentSnapshot.getString("candidate"); //null if not exist
-                    if (str != null) { // is ice candidate
-                        //remote ice candidate received
-                        String candidate = documentSnapshot.getString("candidate");
-                        String id = documentSnapshot.getString("id");
-                        Integer label = documentSnapshot.getLong("label").intValue();
-                        String type = documentSnapshot.getString("type");
-                        mLocalPeerConnection.addIceCandidate(new IceCandidate(id, label, candidate));
-                    }
-                    str = documentSnapshot.getString("message");
-                    if (str != null) { // is a message
-
-                    }
                     str = documentSnapshot.getString("sdp");
                     if (str != null) { // is a sdp
-                        mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(),
-                                new SessionDescription(SessionDescription.Type.fromCanonicalForm(documentSnapshot.getString("type").toLowerCase()), documentSnapshot.getString("sdp")));
+                        String type = documentSnapshot.getString("type");
+                        try {
+                            if (type.equals("offer")) {
+                                mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(),
+                                        new SessionDescription(SessionDescription.Type.fromCanonicalForm(documentSnapshot.getString("type").toLowerCase()), documentSnapshot.getString("sdp")));
+                                doAnswer();
+                            }
+                            if (type.equals("answer")) {
+                                mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(),
+                                        new SessionDescription(SessionDescription.Type.fromCanonicalForm(documentSnapshot.getString("type").toLowerCase()), documentSnapshot.getString("sdp")));
+                            }
+                        } catch (NullPointerException exc) {
+                            //TODO: fix this
+                        }
+
                     }
                 }
             }
         });
     }
 
-    //// METHODS REGION
-
+    //region WebRTC initialisations
     private void initSurfaceViews() {
         mEglBase = EglBase.create();
 
@@ -181,8 +230,8 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         PeerConnectionFactory.initialize(initializationOptions);
 
         PeerConnectionFactory.Options peerConnectionFactoryOptions = new PeerConnectionFactory.Options();
-        peerConnectionFactoryOptions.disableEncryption = true;
-        peerConnectionFactoryOptions.disableNetworkMonitor = true;
+        //peerConnectionFactoryOptions.disableEncryption = true;
+        //peerConnectionFactoryOptions.disableNetworkMonitor = true;
 
         mPeerConnectionFactory = PeerConnectionFactory.builder()
                 .setVideoDecoderFactory(new DefaultVideoDecoderFactory(mEglBase.getEglBaseContext()))
@@ -191,6 +240,82 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 .createPeerConnectionFactory();
 
         mPeerConnectionFactory.setVideoHwAccelerationOptions(mEglBase.getEglBaseContext(), mEglBase.getEglBaseContext());
+    }
+
+    private VideoCapturer createVideoCapturer() {
+        VideoCapturer videoCapturer;
+        if (useCamera2()) {
+            videoCapturer = createCameraCapturer(new Camera2Enumerator(this));
+        } else {
+            videoCapturer = createCameraCapturer(new Camera1Enumerator(true));
+        }
+        return videoCapturer;
+    }
+
+    private boolean useCamera2() {
+        return Camera2Enumerator.isSupported(this);
+    }
+
+    private VideoCapturer createCameraCapturer(CameraEnumerator enumerator) {
+        final String[] deviceNames = enumerator.getDeviceNames();
+
+        // Trying to find main camera
+        for (String deviceName : deviceNames) {
+            if (enumerator.isFrontFacing(deviceName)) {
+                VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
+                if (videoCapturer != null) {
+                    return videoCapturer;
+                }
+            }
+        }
+
+        // Trying to find a front facing camera!
+        for (String deviceName : deviceNames) {
+            if (!enumerator.isFrontFacing(deviceName)) {
+                VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
+
+                if (videoCapturer != null) {
+                    return videoCapturer;
+                }
+            }
+        }
+        return null;
+    }
+    //endregion
+
+    private void onConnectionStart() {
+        if (SignallingClient.getInstance().hasPandingOffer && !SignallingClient.getInstance().isStarted) {
+            SignallingClient.getInstance().isStarted = true;
+            createPeerConnection();
+            mDatabase.collection(LogedInUser.getInstance().getEmail()).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                @Override
+                public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                    if (task.isSuccessful()) {
+                        List<DocumentSnapshot> myListOfDocuments = task.getResult().getDocuments();
+                        for(DocumentSnapshot documentSnapshot : myListOfDocuments){
+                            if(documentSnapshot.getId().equals(Constants.DOCUMENT_SDP)){
+                                mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(),
+                                        new SessionDescription(SessionDescription.Type.fromCanonicalForm(documentSnapshot.getString("type").toLowerCase()), documentSnapshot.getString("sdp")));
+                                doAnswer();
+                            }
+                            if(documentSnapshot.getId().equals(Constants.DOCUMENT_FROM)){
+                                UserModel userModel = documentSnapshot.toObject(UserModel.class);
+                                CollectionReference colRef = mDatabase.collection(userModel.getEmail());
+                                SignallingClient.getInstance().setDatabaseReference(colRef);
+                            }
+                        }
+                    }
+                }
+            });
+
+        }
+        if (!SignallingClient.getInstance().isStarted && SignallingClient.getInstance().getChannelState()) {
+            createPeerConnection();
+            SignallingClient.getInstance().isStarted = true;
+            if (SignallingClient.getInstance().isInitiator) {
+                doCall();
+            }
+        }
     }
 
     /**
@@ -338,57 +463,6 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         }, mMediaConstraints);
 
 
-    }
-
-    private void requestPermission() {
-        String[] perms = {Manifest.permission.CAMERA, Manifest.permission.INTERNET, Manifest.permission.ACCESS_NETWORK_STATE,
-                Manifest.permission.CHANGE_NETWORK_STATE, Manifest.permission.RECORD_AUDIO, Manifest.permission.MODIFY_AUDIO_SETTINGS,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE};
-
-        if (!EasyPermissions.hasPermissions(this, perms)) {
-            EasyPermissions.requestPermissions(this, "rationale", Constants_Permissions.RC_WEBRTC, perms);
-        }
-
-    }
-
-    private VideoCapturer createVideoCapturer() {
-        VideoCapturer videoCapturer;
-        if (useCamera2()) {
-            videoCapturer = createCameraCapturer(new Camera2Enumerator(this));
-        } else {
-            videoCapturer = createCameraCapturer(new Camera1Enumerator(true));
-        }
-        return videoCapturer;
-    }
-
-    private boolean useCamera2() {
-        return Camera2Enumerator.isSupported(this);
-    }
-
-    private VideoCapturer createCameraCapturer(CameraEnumerator enumerator) {
-        final String[] deviceNames = enumerator.getDeviceNames();
-
-        // Trying to find main camera
-        for (String deviceName : deviceNames) {
-            if (enumerator.isFrontFacing(deviceName)) {
-                VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
-                if (videoCapturer != null) {
-                    return videoCapturer;
-                }
-            }
-        }
-
-        // Trying to find a front facing camera!
-        for (String deviceName : deviceNames) {
-            if (!enumerator.isFrontFacing(deviceName)) {
-                VideoCapturer videoCapturer = enumerator.createCapturer(deviceName, null);
-
-                if (videoCapturer != null) {
-                    return videoCapturer;
-                }
-            }
-        }
-        return null;
     }
 
 

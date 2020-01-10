@@ -1,6 +1,7 @@
 package ro.atm.proiectretele.view.activities;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProviders;
@@ -16,6 +17,8 @@ import android.view.View;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.EventListener;
+import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -39,8 +42,9 @@ public class MainActivity extends AppCompatActivity {
     private UserAdapter mAdapter;
 
     private FirebaseFirestore mDatabase = FirebaseFirestore.getInstance();
-    private DocumentReference noteRef = mDatabase.document("user-com/sig-client");
     private CollectionReference onlineUsersReference = mDatabase.collection(Constants.COLLECTION_ONLINE_USERS);
+    private DocumentReference sdpRef = mDatabase.collection(LogedInUser.getInstance().getEmail()).document(Constants.DOCUMENT_SDP);
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
         binding.activityMainUsers.setLayoutManager(new LinearLayoutManager(this));
         binding.activityMainUsers.setAdapter(mAdapter);
 
-       // Testing();
+        // Testing();
 
         mAdapter.setOnItemClickListener(new UserAdapter.OnItemClickListener() {
             @Override
@@ -77,8 +81,37 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        SignallingClient.getInstance().doRefresh();
         mAdapter.startListening(); // cand aplicatia revine din backgroud, adaptorul incepe sa asculte din nou
+        sdpRef.addSnapshotListener(this, new EventListener<DocumentSnapshot>() {
+            @Override
+            public void onEvent(@Nullable DocumentSnapshot documentSnapshot, @Nullable FirebaseFirestoreException e) {
+                if (e != null)
+                    return;
+                String str;
+                if (documentSnapshot.exists()) {
+                    str = documentSnapshot.getString("message");
+                    if (str != null) { // is a message
 
+                    }
+                    str = documentSnapshot.getString("sdp");
+                    if (str != null) { // is a sdp
+                        String type = documentSnapshot.getString("type");
+                        try {
+                            if (type.equals("offer")) {
+                                SignallingClient.getInstance().hasPandingOffer = true;
+                                Intent intent = new Intent(MainActivity.this, MediaStreamActivity.class);
+                                startActivity(intent);
+                            }
+
+                        } catch (NullPointerException exc) {
+                            //TODO: fix this
+                        }
+
+                    }
+                }
+            }
+        });
     }
 
     @Override
@@ -96,11 +129,12 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        switch (item.getItemId()){
+        switch (item.getItemId()) {
             case R.id.menu_main_activity_logout:
                 this.onBackPressed();
                 return true;
-            default: return super.onOptionsItemSelected(item);
+            default:
+                return super.onOptionsItemSelected(item);
         }
 
     }
@@ -108,36 +142,22 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         LogedInUser logedInUser = LogedInUser.getInstance();
-        if(logedInUser != null){
+        if (logedInUser != null) {
             CloudFirestoreRepository.create().onUserSignOut(new UserModel(logedInUser));
         }
         super.onBackPressed();
     }
 
-    //// METHODS
-    /*public void Testing(){
-        FirebaseFirestore.getInstance()
-                .collection(Constants.COLLECTION_ONLINE_USERS)
-                .get()
-                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                    @Override
-                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                        if (task.isSuccessful()) {
-                            List<DocumentSnapshot> myListOfDocuments = task.getResult().getDocuments();
-                            for(DocumentSnapshot documentSnapshot : myListOfDocuments){
-                                binding.activityMainEt.setText(binding.activityMainEt.getText().toString() + documentSnapshot.getString("email"));
-                            }
-                        }
-
-                    }
-                });
-    }*/
-
-    public void onButton(View view){
-
-
-        SignallingClient signallingClient = SignallingClient.getInstance();
-        signallingClient.emitMessage("mesajul trimis!");
+    public void onCallButtonClicked(View view) {
+        //set noteReference
+        if (binding.activityMainSelectedUser.getText().toString().equals("Please select a user!")) {
+            return;
+        }
+        // set collection where i send data
+        CollectionReference colRef = mDatabase.collection(binding.activityMainSelectedUser.getText().toString());
+        colRef.document(Constants.DOCUMENT_FROM).set(new UserModel(LogedInUser.getInstance()));
+        SignallingClient.getInstance().setDatabaseReference(colRef);
+        SignallingClient.getInstance().isInitiator = true;
 
         Intent intent = new Intent(MainActivity.this, MediaStreamActivity.class);
         startActivity(intent);
