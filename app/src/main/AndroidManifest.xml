@@ -24,7 +24,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".view.activities.MainActivity"></activity>
+        <activity android:name=".view.activities.MessengerActivity"></activity>
+        <activity android:name=".view.activities.MainActivity" />
         <activity
             android:name=".view.activities.SignupActivity"
             android:parentActivityName=".view.activities.LogInActivity" />

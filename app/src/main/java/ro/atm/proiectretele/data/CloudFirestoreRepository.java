@@ -5,6 +5,9 @@ import android.util.Log;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.Map;
+
+import ro.atm.proiectretele.data.firestore_models.MessageModel;
 import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
 
@@ -56,5 +59,10 @@ public class CloudFirestoreRepository {
         if (user != null) {
             userCommunicationReference.document(user.getEmail()).set(new UserModel(user));
         }
+    }
+
+    public void onMessageSend(Map messageModel, String to){
+        database.collection(to).add(messageModel);
+
     }
 }

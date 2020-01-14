@@ -48,10 +48,10 @@ public class LogInActivity extends AppCompatActivity {
         mViewModel.onEmailLogin(view);
 
         //TODO: this is temporary
-        LogedInUser logedInUser = LogedInUser.getInstance("test", "test", "test");
+        /*LogedInUser logedInUser = LogedInUser.getInstance("test", "test", "test");
         Intent intent = new Intent(LogInActivity.this, MainActivity.class);
-        startActivity(intent);
-/*
+        startActivity(intent);*/
+
         FirebaseUser user = mViewModel.getUser();
         if(user != null){ // user si auth
             LogedInUser logedInUser = LogedInUser.getInstance(user.getUid(), user.getEmail(), user.getDisplayName());
@@ -63,7 +63,7 @@ public class LogInActivity extends AppCompatActivity {
             startActivity(intent);
         }else{
             Log.d(TAG, "Login error!");
-        }*/
+        }
     }
 
 }

@@ -8,28 +8,18 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Base64;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 
+import com.firebase.ui.auth.data.model.User;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import org.webrtc.PeerConnection;
-
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.List;
-
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 import ro.atm.proiectretele.R;
 import ro.atm.proiectretele.adapters.UserAdapter;
 import ro.atm.proiectretele.data.CloudFirestoreRepository;
@@ -37,9 +27,7 @@ import ro.atm.proiectretele.data.Constants;
 import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityMainBinding;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
-import ro.atm.proiectretele.utils.webrtc.IceServer;
-import ro.atm.proiectretele.utils.webrtc.TurnServerPojo;
-import ro.atm.proiectretele.utils.webrtc.Utils;
+import ro.atm.proiectretele.utils.webrtc.SignallingClientSocket;
 import ro.atm.proiectretele.viewmodel.MainActivityViewModel;
 
 public class MainActivity extends AppCompatActivity {
@@ -77,9 +65,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onItemClick(DocumentSnapshot documentSnapshot, int position) {
                 UserModel userModel = documentSnapshot.toObject(UserModel.class);
-                String id = documentSnapshot.getId();
-                String path = documentSnapshot.getReference().getPath();
-                binding.activityMainSelectedUser.setText(userModel.getEmail());
+                Intent intent = new Intent(MainActivity.this, MessengerActivity.class);
+                intent.putExtra("init", userModel.getEmail());
+                startActivity(intent);
             }
         });
     }
@@ -128,10 +116,11 @@ public class MainActivity extends AppCompatActivity {
 
     public void onCallButtonClicked(View view) {
         //set noteReference
-        if (binding.activityMainSelectedUser.getText().toString().equals("Please select a user!")) {
+        if (binding.activityMainRoom.getText().toString().trim().isEmpty()) {
             return;
         }
         // set collection where i send data
+        SignallingClientSocket.getInstance().setRoomName(binding.activityMainRoom.getText().toString());
 
         Intent intent = new Intent(MainActivity.this, MediaStreamActivity.class);
         startActivity(intent);

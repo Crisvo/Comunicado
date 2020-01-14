@@ -51,13 +51,14 @@ public class SignallingClientSocket {
     private Socket socket;
     private SignallingInterface callback;
 
+
     public static SignallingClientSocket getInstance() {
         if (instance == null) {
             instance = new SignallingClientSocket();
         }
         if (instance.roomName == null) {
             //set the room name here
-            instance.roomName = "vivek17";
+            instance.roomName = "default";
         }
         return instance;
     }
@@ -188,5 +189,9 @@ public class SignallingClientSocket {
         socket.emit("bye", roomName);
         socket.disconnect();
         socket.close();
+    }
+
+    public void setRoomName(String roomName) {
+        this.roomName = roomName;
     }
 }

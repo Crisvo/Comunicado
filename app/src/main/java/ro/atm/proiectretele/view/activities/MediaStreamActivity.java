@@ -15,16 +15,9 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.FirebaseFirestoreException;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
-import com.google.firebase.firestore.QuerySnapshot;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -49,7 +42,6 @@ import org.webrtc.VideoTrack;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
@@ -58,7 +50,6 @@ import retrofit2.Callback;
 import retrofit2.Response;
 import ro.atm.proiectretele.R;
 import ro.atm.proiectretele.data.Constants;
-import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityMediaStreamBinding;
 import ro.atm.proiectretele.utils.app.constant.Constants_Permissions;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
@@ -305,11 +296,11 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
      * Creating local peer connection instance
      */
     private void createPeerConnection() {
-        //List<PeerConnection.IceServer> iceServers = new ArrayList<>();
-        //PeerConnection.IceServer stunServerList = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
-        //iceServers.add(stunServerList);
+        List<PeerConnection.IceServer> iceServers = new ArrayList<>();
+        PeerConnection.IceServer stunServerList = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
+        iceServers.add(stunServerList);
 
-        PeerConnection.RTCConfiguration rtcConfiguration = new PeerConnection.RTCConfiguration(peerIceServers);
+        PeerConnection.RTCConfiguration rtcConfiguration = new PeerConnection.RTCConfiguration(iceServers);
 
         rtcConfiguration.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.DISABLED;
         rtcConfiguration.bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE;
@@ -334,7 +325,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 runOnUiThread(() -> {
                     try {
                         VideoTrack remoteVideoTrack = mediaStream.videoTracks.get(0);
-                        remoteVideoTrack.setEnabled(true);
+                        //remoteVideoTrack.setEnabled(true);
                         remoteVideoTrack.addSink(binding.activityMediaStreamRemotelView);
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -362,7 +353,6 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 super.onCreateSuccess(sessionDescription);
                 mLocalPeerConnection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
                 Log.d("onCreateSuccess", "SignallingClientFirestore emit ");
-                //SignallingClientFirestore.getInstance().emitMessage(sessionDescription);
                 SignallingClientSocket.getInstance().emitMessage(sessionDescription);
                 // send sdp to the other peer
 
