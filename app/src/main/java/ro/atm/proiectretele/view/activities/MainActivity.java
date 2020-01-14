@@ -1,7 +1,6 @@
 package ro.atm.proiectretele.view.activities;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProviders;
@@ -9,6 +8,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Base64;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -16,13 +17,19 @@ import android.view.View;
 
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.CollectionReference;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.EventListener;
-import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import org.webrtc.PeerConnection;
+
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import ro.atm.proiectretele.R;
 import ro.atm.proiectretele.adapters.UserAdapter;
 import ro.atm.proiectretele.data.CloudFirestoreRepository;
@@ -30,7 +37,9 @@ import ro.atm.proiectretele.data.Constants;
 import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityMainBinding;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
-import ro.atm.proiectretele.utils.webrtc.SignallingClient;
+import ro.atm.proiectretele.utils.webrtc.IceServer;
+import ro.atm.proiectretele.utils.webrtc.TurnServerPojo;
+import ro.atm.proiectretele.utils.webrtc.Utils;
 import ro.atm.proiectretele.viewmodel.MainActivityViewModel;
 
 public class MainActivity extends AppCompatActivity {
@@ -43,7 +52,6 @@ public class MainActivity extends AppCompatActivity {
 
     private FirebaseFirestore mDatabase = FirebaseFirestore.getInstance();
     private CollectionReference onlineUsersReference = mDatabase.collection(Constants.COLLECTION_ONLINE_USERS);
-    private DocumentReference sdpRef = mDatabase.collection(LogedInUser.getInstance().getEmail()).document(Constants.DOCUMENT_SDP);
 
 
     @Override
@@ -65,8 +73,6 @@ public class MainActivity extends AppCompatActivity {
         binding.activityMainUsers.setLayoutManager(new LinearLayoutManager(this));
         binding.activityMainUsers.setAdapter(mAdapter);
 
-        // Testing();
-
         mAdapter.setOnItemClickListener(new UserAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(DocumentSnapshot documentSnapshot, int position) {
@@ -81,37 +87,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        SignallingClient.getInstance().doRefresh();
+        //SignallingClientFirestore.getInstance().doRefresh();
         mAdapter.startListening(); // cand aplicatia revine din backgroud, adaptorul incepe sa asculte din nou
-        sdpRef.addSnapshotListener(this, new EventListener<DocumentSnapshot>() {
-            @Override
-            public void onEvent(@Nullable DocumentSnapshot documentSnapshot, @Nullable FirebaseFirestoreException e) {
-                if (e != null)
-                    return;
-                String str;
-                if (documentSnapshot.exists()) {
-                    str = documentSnapshot.getString("message");
-                    if (str != null) { // is a message
 
-                    }
-                    str = documentSnapshot.getString("sdp");
-                    if (str != null) { // is a sdp
-                        String type = documentSnapshot.getString("type");
-                        try {
-                            if (type.equals("offer")) {
-                                SignallingClient.getInstance().hasPandingOffer = true;
-                                Intent intent = new Intent(MainActivity.this, MediaStreamActivity.class);
-                                startActivity(intent);
-                            }
-
-                        } catch (NullPointerException exc) {
-                            //TODO: fix this
-                        }
-
-                    }
-                }
-            }
-        });
     }
 
     @Override
@@ -154,10 +132,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         // set collection where i send data
-        CollectionReference colRef = mDatabase.collection(binding.activityMainSelectedUser.getText().toString());
-        colRef.document(Constants.DOCUMENT_FROM).set(new UserModel(LogedInUser.getInstance()));
-        SignallingClient.getInstance().setDatabaseReference(colRef);
-        SignallingClient.getInstance().isInitiator = true;
 
         Intent intent = new Intent(MainActivity.this, MediaStreamActivity.class);
         startActivity(intent);

@@ -17,7 +17,6 @@ import ro.atm.proiectretele.data.CloudFirestoreRepository;
 import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityLogInBinding;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
-import ro.atm.proiectretele.utils.webrtc.SignallingClient;
 import ro.atm.proiectretele.viewmodel.LogInViewModel;
 
 public class LogInActivity extends AppCompatActivity {
@@ -48,6 +47,11 @@ public class LogInActivity extends AppCompatActivity {
     public void onLogin(View view){
         mViewModel.onEmailLogin(view);
 
+        //TODO: this is temporary
+        LogedInUser logedInUser = LogedInUser.getInstance("test", "test", "test");
+        Intent intent = new Intent(LogInActivity.this, MainActivity.class);
+        startActivity(intent);
+/*
         FirebaseUser user = mViewModel.getUser();
         if(user != null){ // user si auth
             LogedInUser logedInUser = LogedInUser.getInstance(user.getUid(), user.getEmail(), user.getDisplayName());
@@ -59,7 +63,7 @@ public class LogInActivity extends AppCompatActivity {
             startActivity(intent);
         }else{
             Log.d(TAG, "Login error!");
-        }
+        }*/
     }
 
 }

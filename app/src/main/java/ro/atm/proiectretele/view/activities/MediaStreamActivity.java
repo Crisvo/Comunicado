@@ -8,12 +8,14 @@ import androidx.lifecycle.ViewModelProviders;
 
 import android.Manifest;
 import android.os.Bundle;
-import android.os.UserManager;
+import android.util.Base64;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
@@ -24,6 +26,8 @@ import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
 import org.webrtc.Camera1Enumerator;
@@ -42,12 +46,16 @@ import org.webrtc.VideoCapturer;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.EasyPermissions;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 import ro.atm.proiectretele.R;
 import ro.atm.proiectretele.data.Constants;
 import ro.atm.proiectretele.data.firestore_models.UserModel;
@@ -55,12 +63,16 @@ import ro.atm.proiectretele.databinding.ActivityMediaStreamBinding;
 import ro.atm.proiectretele.utils.app.constant.Constants_Permissions;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
 import ro.atm.proiectretele.utils.webrtc.CustomPeerConnectionObserver;
-import ro.atm.proiectretele.utils.webrtc.SignallingClient;
+import ro.atm.proiectretele.utils.webrtc.IceServer;
+import ro.atm.proiectretele.utils.webrtc.SignallingClientSocket;
+import ro.atm.proiectretele.utils.webrtc.SignallingInterface;
 import ro.atm.proiectretele.utils.webrtc.SimpleSdpObserver;
+import ro.atm.proiectretele.utils.webrtc.TurnServerPojo;
+import ro.atm.proiectretele.utils.webrtc.Utils;
 import ro.atm.proiectretele.utils.webrtc.VideoTransmissionParameters;
 import ro.atm.proiectretele.viewmodel.MediaStreamViewModel;
 
-public class MediaStreamActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks {
+public class MediaStreamActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks, SignallingInterface {
     private static final String TAG = "MediaStreamActivity";
     //region Members
     private ActivityMediaStreamBinding binding;
@@ -72,15 +84,21 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     private SimpleSdpObserver mLocalSdp;
     private SimpleSdpObserver mRemoteSdp;
 
-    private VideoTrack mVideoTrackFromCamera;
+    List<IceServer> iceServers;
     private AudioTrack mLocalAudioTrack;
 
     private MediaConstraints mMediaConstraints;
+    List<PeerConnection.IceServer> peerIceServers = new ArrayList<>();
+    private VideoTrack mLocalVideoTrack;
+    private MediaConstraints mSdpConstraints;
     private EglBase mEglBase;
+    private MediaConstraints mVideoConstraints;
 
     private FirebaseFirestore mDatabase = FirebaseFirestore.getInstance();
     private DocumentReference sdpRef = mDatabase.collection(LogedInUser.getInstance().getEmail()).document(Constants.DOCUMENT_SDP);
     private CollectionReference colRef = mDatabase.collection(LogedInUser.getInstance().getEmail());
+    private MediaConstraints mAudioConstraints;
+    private boolean gotUserMedia;
     //endregion
 
     @Override
@@ -100,10 +118,10 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
         initSurfaceViews();
         createPeerConnectionFactory();
+        getIceServers();
         createVideoTrackFromCameraAndShowIt();
 
         //P2Pcall();
-        onConnectionStart();
 
     }
 
@@ -137,58 +155,50 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         }
 
     }
-//endregion
+
+    //endregion
+    private void getIceServers() {
+        //get Ice servers using xirsys
+        byte[] data = new byte[0];
+        try {
+            data = ("<xirsys_ident>:<xirsys_secret>").getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
+        String authToken = "Basic " + Base64.encodeToString(data, Base64.NO_WRAP);
+        Utils.getInstance().getRetrofitInstance().getIceCandidates(authToken).enqueue(new Callback<TurnServerPojo>() {
+            @Override
+            public void onResponse(@NonNull Call<TurnServerPojo> call, @NonNull Response<TurnServerPojo> response) {
+                TurnServerPojo body = response.body();
+                if (body != null) {
+                    iceServers = body.iceServerList.iceServers;
+                }
+                for (IceServer iceServer : iceServers) {
+                    if (iceServer.credential == null) {
+                        PeerConnection.IceServer peerIceServer = PeerConnection.IceServer.builder(iceServer.url).createIceServer();
+                        peerIceServers.add(peerIceServer);
+                    } else {
+                        PeerConnection.IceServer peerIceServer = PeerConnection.IceServer.builder(iceServer.url)
+                                .setUsername(iceServer.username)
+                                .setPassword(iceServer.credential)
+                                .createIceServer();
+                        peerIceServers.add(peerIceServer);
+                    }
+                }
+                Log.d("onApiResponse", "IceServers\n" + iceServers.toString());
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<TurnServerPojo> call, @NonNull Throwable t) {
+                t.printStackTrace();
+            }
+        });
+    }
 
     @Override
     protected void onStart() {
         super.onStart();
-        colRef.addSnapshotListener(this, new EventListener<QuerySnapshot>() {
-            @Override
-            public void onEvent(@Nullable QuerySnapshot queryDocumentSnapshots, @Nullable FirebaseFirestoreException e) {
-                if (e != null) {
-                    return;
-                }
 
-                for (QueryDocumentSnapshot documentSnapshot : queryDocumentSnapshots) {
-                    String docId = documentSnapshot.getId();
-                    if (!docId.equals(Constants.DOCUMENT_SDP) && !docId.equals(Constants.DOCUMENT_FROM)) {
-                        String candidate = documentSnapshot.getString("candidate");
-                        String id = documentSnapshot.getString("id");
-                        int label = Objects.requireNonNull(documentSnapshot.getLong("label")).intValue();
-                        String type = documentSnapshot.getString("type");
-                        mLocalPeerConnection.addIceCandidate(new IceCandidate(id, label, candidate));
-                    }
-                }
-            }
-        });
-        sdpRef.addSnapshotListener(this, new EventListener<DocumentSnapshot>() {
-            @Override
-            public void onEvent(@Nullable DocumentSnapshot documentSnapshot, @Nullable FirebaseFirestoreException e) {
-                if (e != null)
-                    return;
-                String str;
-                if (documentSnapshot.exists()) {
-                    str = documentSnapshot.getString("sdp");
-                    if (str != null) { // is a sdp
-                        String type = documentSnapshot.getString("type");
-                        try {
-                            if (type.equals("offer")) {
-                                mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(),
-                                        new SessionDescription(SessionDescription.Type.fromCanonicalForm(documentSnapshot.getString("type").toLowerCase()), documentSnapshot.getString("sdp")));
-                                doAnswer();
-                            }
-                            if (type.equals("answer")) {
-                                mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(),
-                                        new SessionDescription(SessionDescription.Type.fromCanonicalForm(documentSnapshot.getString("type").toLowerCase()), documentSnapshot.getString("sdp")));
-                            }
-                        } catch (NullPointerException exc) {
-                            //TODO: fix this
-                        }
-
-                    }
-                }
-            }
-        });
     }
 
     //region WebRTC initialisations
@@ -214,12 +224,18 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
         videoCapturer.startCapture(VideoTransmissionParameters.HD_VIDEO_WIDTH, VideoTransmissionParameters.HD_VIDEO_HEIGHT, VideoTransmissionParameters.VIDEO_FPS_60);
 
-        mVideoTrackFromCamera = mPeerConnectionFactory.createVideoTrack(VideoTransmissionParameters.VIDEO_TRACK_ID, videoSource);
-        mVideoTrackFromCamera.setEnabled(true);
-        mVideoTrackFromCamera.addSink(binding.activityMediaStreamLocalView);
+        mLocalVideoTrack = mPeerConnectionFactory.createVideoTrack(VideoTransmissionParameters.VIDEO_TRACK_ID, videoSource);
+        mLocalVideoTrack.setEnabled(true);
+        mLocalVideoTrack.addSink(binding.activityMediaStreamLocalView);
 
         AudioSource source = mPeerConnectionFactory.createAudioSource(mMediaConstraints);
         mLocalAudioTrack = mPeerConnectionFactory.createAudioTrack(VideoTransmissionParameters.AUDIO_TRACK_ID, source);
+
+        gotUserMedia = true;
+
+        if (SignallingClientSocket.getInstance().isInitiator) {
+            onTryToStart();
+        }
     }
 
     private void createPeerConnectionFactory() {
@@ -228,6 +244,8 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 .setEnableVideoHwAcceleration(true)
                 .createInitializationOptions();
         PeerConnectionFactory.initialize(initializationOptions);
+
+        SignallingClientSocket.getInstance().init(this);
 
         PeerConnectionFactory.Options peerConnectionFactoryOptions = new PeerConnectionFactory.Options();
         //peerConnectionFactoryOptions.disableEncryption = true;
@@ -283,50 +301,15 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     }
     //endregion
 
-    private void onConnectionStart() {
-        if (SignallingClient.getInstance().hasPandingOffer && !SignallingClient.getInstance().isStarted) {
-            SignallingClient.getInstance().isStarted = true;
-            createPeerConnection();
-            mDatabase.collection(LogedInUser.getInstance().getEmail()).get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                @Override
-                public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                    if (task.isSuccessful()) {
-                        List<DocumentSnapshot> myListOfDocuments = task.getResult().getDocuments();
-                        for(DocumentSnapshot documentSnapshot : myListOfDocuments){
-                            if(documentSnapshot.getId().equals(Constants.DOCUMENT_SDP)){
-                                mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(),
-                                        new SessionDescription(SessionDescription.Type.fromCanonicalForm(documentSnapshot.getString("type").toLowerCase()), documentSnapshot.getString("sdp")));
-                                doAnswer();
-                            }
-                            if(documentSnapshot.getId().equals(Constants.DOCUMENT_FROM)){
-                                UserModel userModel = documentSnapshot.toObject(UserModel.class);
-                                CollectionReference colRef = mDatabase.collection(userModel.getEmail());
-                                SignallingClient.getInstance().setDatabaseReference(colRef);
-                            }
-                        }
-                    }
-                }
-            });
-
-        }
-        if (!SignallingClient.getInstance().isStarted && SignallingClient.getInstance().getChannelState()) {
-            createPeerConnection();
-            SignallingClient.getInstance().isStarted = true;
-            if (SignallingClient.getInstance().isInitiator) {
-                doCall();
-            }
-        }
-    }
-
     /**
      * Creating local peer connection instance
      */
     private void createPeerConnection() {
-        List<PeerConnection.IceServer> iceServers = new ArrayList<>();
-        PeerConnection.IceServer stunServerList = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
-        iceServers.add(stunServerList);
+        //List<PeerConnection.IceServer> iceServers = new ArrayList<>();
+        //PeerConnection.IceServer stunServerList = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer();
+        //iceServers.add(stunServerList);
 
-        PeerConnection.RTCConfiguration rtcConfiguration = new PeerConnection.RTCConfiguration(iceServers);
+        PeerConnection.RTCConfiguration rtcConfiguration = new PeerConnection.RTCConfiguration(peerIceServers);
 
         rtcConfiguration.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.DISABLED;
         rtcConfiguration.bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE;
@@ -340,8 +323,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             public void onIceCandidate(IceCandidate iceCandidate) {
                 super.onIceCandidate(iceCandidate);
                 Log.d(TAG, "onIceCandidate: local");
-                //mRemotePeerConnection.addIceCandidate(iceCandidate);
-                SignallingClient.getInstance().emitIceCandidate(iceCandidate);
+                SignallingClientSocket.getInstance().emitIceCandidate(iceCandidate);
                 // send to remote peer connection
             }
 
@@ -349,11 +331,22 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             public void onAddStream(MediaStream mediaStream) {
                 super.onAddStream(mediaStream);
                 Log.d(TAG, "onAddStream: local");
-                VideoTrack remoteVideoTrack = mediaStream.videoTracks.get(0);
-                remoteVideoTrack.setEnabled(true);
-                remoteVideoTrack.addSink(binding.activityMediaStreamRemotelView);
+                runOnUiThread(() -> {
+                    try {
+                        VideoTrack remoteVideoTrack = mediaStream.videoTracks.get(0);
+                        remoteVideoTrack.setEnabled(true);
+                        remoteVideoTrack.addSink(binding.activityMediaStreamRemotelView);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
             }
         });
+        MediaStream mediaStream = mPeerConnectionFactory.createLocalMediaStream("007");
+        mediaStream.addTrack(mLocalVideoTrack);
+        mediaStream.addTrack(mLocalAudioTrack);
+
+        mLocalPeerConnection.addStream(mediaStream);
 
     }
 
@@ -368,8 +361,9 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             public void onCreateSuccess(SessionDescription sessionDescription) {
                 super.onCreateSuccess(sessionDescription);
                 mLocalPeerConnection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
-                Log.d("onCreateSuccess", "SignallingClient emit ");
-                SignallingClient.getInstance().emitMessage(sessionDescription);
+                Log.d("onCreateSuccess", "SignallingClientFirestore emit ");
+                //SignallingClientFirestore.getInstance().emitMessage(sessionDescription);
+                SignallingClientSocket.getInstance().emitMessage(sessionDescription);
                 // send sdp to the other peer
 
             }
@@ -383,7 +377,8 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             public void onCreateSuccess(SessionDescription sessionDescription) {
                 super.onCreateSuccess(sessionDescription);
                 mLocalPeerConnection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
-                SignallingClient.getInstance().emitMessage(sessionDescription);
+                //SignallingClientFirestore.getInstance().emitMessage(sessionDescription);
+                SignallingClientSocket.getInstance().emitMessage(sessionDescription);
                 // send sdp to the other peer
             }
         }, new MediaConstraints());
@@ -402,7 +397,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
             public void onIceCandidate(IceCandidate iceCandidate) {
                 super.onIceCandidate(iceCandidate);
                 Log.d(TAG, "onIceCandidate: local");
-                SignallingClient.getInstance().emitIceCandidate(iceCandidate);
+                //SignallingClientFirestore.getInstance().emitIceCandidate(iceCandidate);
                 mRemotePeerConnection.addIceCandidate(iceCandidate);
             }
         });
@@ -426,7 +421,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
         });
 
         MediaStream mediaStream = mPeerConnectionFactory.createLocalMediaStream("007");
-        mediaStream.addTrack(mVideoTrackFromCamera);
+        mediaStream.addTrack(mLocalVideoTrack);
 
         mLocalPeerConnection.addStream(mediaStream);
 
@@ -437,7 +432,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
                 Log.d(TAG, "onCreateSuccess local");
                 mLocalPeerConnection.setLocalDescription(new SimpleSdpObserver(), sessionDescription);
                 mRemotePeerConnection.setRemoteDescription(new SimpleSdpObserver(), sessionDescription);
-                SignallingClient.getInstance().emitMessage(sessionDescription);
+                //SignallingClientFirestore.getInstance().emitMessage(sessionDescription);
                 mRemotePeerConnection.createAnswer(new SimpleSdpObserver() {
                     @Override
                     public void onCreateSuccess(SessionDescription sessionDescription) {
@@ -465,5 +460,132 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
     }
 
+    /**
+     * Util Methods
+     */
+    public int dpToPx(int dp) {
+        DisplayMetrics displayMetrics = getResources().getDisplayMetrics();
+        return Math.round(dp * (displayMetrics.xdpi / DisplayMetrics.DENSITY_DEFAULT));
+    }
 
+
+    private void updateVideoViews(final boolean remoteVisible) {
+        runOnUiThread(() -> {
+            ViewGroup.LayoutParams params = binding.activityMediaStreamLocalView.getLayoutParams();
+            if (remoteVisible) {
+                params.height = dpToPx(100);
+                params.width = dpToPx(100);
+            } else {
+                params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            }
+            binding.activityMediaStreamLocalView.setLayoutParams(params);
+        });
+
+    }
+
+    private void hangUp() {
+        try {
+            mLocalPeerConnection.close();
+            mLocalPeerConnection = null;
+            SignallingClientSocket.getInstance().close();
+            updateVideoViews(false);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public void showToast(final String msg) {
+        runOnUiThread(() -> Toast.makeText(MediaStreamActivity.this, msg, Toast.LENGTH_SHORT).show());
+    }
+
+    @Override
+    public void onRemoteHangUp(String msg) {
+        showToast("Remote Peer hungup");
+        runOnUiThread(this::hangUp);
+    }
+
+    @Override
+    public void onOfferReceived(JSONObject data) {
+        showToast("Received Offer");
+        runOnUiThread(() -> {
+            if (!SignallingClientSocket.getInstance().isInitiator && !SignallingClientSocket.getInstance().isStarted) {
+                onTryToStart();
+            }
+
+            try {
+                mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(), new SessionDescription(SessionDescription.Type.OFFER, data.getString("sdp")));
+                doAnswer();
+                updateVideoViews(true);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    /**
+     * Remote sdp (answer) received
+     */
+    @Override
+    public void onAnswerReceived(JSONObject data) {
+        showToast("Received Answer");
+        try {
+            mLocalPeerConnection.setRemoteDescription(new SimpleSdpObserver(), new SessionDescription(SessionDescription.Type.fromCanonicalForm(data.getString("type").toLowerCase()), data.getString("sdp")));
+            //updateVideoViews(true);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Remote ice candidate received
+     */
+    @Override
+    public void onIceCandidateReceived(JSONObject data) {
+        try {
+            mLocalPeerConnection.addIceCandidate(new IceCandidate(data.getString("id"), data.getInt("label"), data.getString("candidate")));
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onTryToStart() {
+        runOnUiThread(() -> {
+            if (!SignallingClientSocket.getInstance().isStarted && mLocalVideoTrack != null && SignallingClientSocket.getInstance().isChannelReady) {
+                createPeerConnection();
+                SignallingClientSocket.getInstance().isStarted = true;
+                if (SignallingClientSocket.getInstance().isInitiator) {
+                    doCall();
+                }
+            }
+        });
+    }
+
+    @Override
+    public void onCreatedRoom() {
+        showToast("You created the room " + gotUserMedia);
+        if (gotUserMedia) {
+            SignallingClientSocket.getInstance().emitMessage("got user media");
+        }
+    }
+
+    @Override
+    public void onJoinedRoom() {
+        showToast("You joined the room " + gotUserMedia);
+        if (gotUserMedia) {
+            SignallingClientSocket.getInstance().emitMessage("got user media");
+        }
+    }
+
+    @Override
+    public void onNewPeerJoined() {
+        showToast("Remote Peer Joined");
+    }
+
+    @Override
+    protected void onDestroy() {
+        SignallingClientSocket.getInstance().close();
+        super.onDestroy();
+    }
 }

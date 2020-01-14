@@ -1,6 +1,5 @@
 package ro.atm.proiectretele.utils.webrtc;
 
-import android.content.Intent;
 import android.util.Log;
 
 import com.google.firebase.firestore.CollectionReference;
@@ -19,12 +18,12 @@ import java.util.Map;
  * @author Cristian VOICU
  * @version 1.0
  */
-public class SignallingClient {
+public class SignallingClientFirestore {
     //// MEMBERS
     private String TAG = "SignalingClient";
 
     //region Constructor region
-    private static SignallingClient INSTANCE = new SignallingClient();
+    private static SignallingClientFirestore INSTANCE = new SignallingClientFirestore();
     public boolean isInitiator = false;
     public boolean isStarted = false;
     public boolean hasPandingOffer = false;
@@ -34,13 +33,13 @@ public class SignallingClient {
     private int iceNr;
     private boolean isChannelReady = false;
 
-    private SignallingClient() {
+    private SignallingClientFirestore() {
 
     }
 
-    public static SignallingClient getInstance() {
+    public static SignallingClientFirestore getInstance() {
         if (INSTANCE == null) {
-            INSTANCE = new SignallingClient();
+            INSTANCE = new SignallingClientFirestore();
         }
         return INSTANCE;
     }
@@ -48,7 +47,7 @@ public class SignallingClient {
     //endregion
 
     public void emitMessage(SessionDescription message) {
-        Log.d("SignallingClient", "emitMessage() called with: message = [" + message + "]");
+        Log.d("SignallingClientFirestore", "emitMessage() called with: message = [" + message + "]");
         comMap = new HashMap<>();
         comMap.put("type", message.type.canonicalForm());
         comMap.put("sdp", message.description);
