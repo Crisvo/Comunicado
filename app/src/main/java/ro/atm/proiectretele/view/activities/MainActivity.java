@@ -13,7 +13,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 
-import com.firebase.ui.auth.data.model.User;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.Query;
@@ -27,7 +26,7 @@ import ro.atm.proiectretele.data.Constants;
 import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityMainBinding;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
-import ro.atm.proiectretele.utils.webrtc.SignallingClientSocket;
+import ro.atm.proiectretele.utils.webrtc.signaling.SignallingClientSocket;
 import ro.atm.proiectretele.viewmodel.MainActivityViewModel;
 
 public class MainActivity extends AppCompatActivity {
@@ -45,6 +44,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        if(savedInstanceState != null){
+            CloudFirestoreRepository repo = CloudFirestoreRepository.create();
+            repo.addOnlineUser(new UserModel(LogedInUser.getInstance()));
+        }
+
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main);
         mViewModel = ViewModelProviders.of(this).get(MainActivityViewModel.class);
 
@@ -73,9 +78,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        CloudFirestoreRepository repo = CloudFirestoreRepository.create();
+        repo.addOnlineUser(new UserModel(LogedInUser.getInstance()));
+    }
+
+    @Override
     protected void onStart() {
         super.onStart();
-        //SignallingClientFirestore.getInstance().doRefresh();
+        CloudFirestoreRepository repo = CloudFirestoreRepository.create();
+        repo.addOnlineUser(new UserModel(LogedInUser.getInstance()));
         mAdapter.startListening(); // cand aplicatia revine din backgroud, adaptorul incepe sa asculte din nou
 
     }
@@ -124,5 +137,11 @@ public class MainActivity extends AppCompatActivity {
 
         Intent intent = new Intent(MainActivity.this, MediaStreamActivity.class);
         startActivity(intent);
+    }
+
+    @Override
+    protected void onDestroy() {
+        CloudFirestoreRepository.create().onUserSignOut(new UserModel(LogedInUser.getInstance()));
+        super.onDestroy();
     }
 }

@@ -48,7 +48,7 @@ public class LogInActivity extends AppCompatActivity {
         mViewModel.onEmailLogin(view);
 
         //TODO: this is temporary
-        /*LogedInUser logedInUser = LogedInUser.getInstance("test", "test", "test");
+        /*LogedInUser logedInUser = LogedInUser.getInstance("test", "emil.anastasiei@gmail.com", "test");
         Intent intent = new Intent(LogInActivity.this, MainActivity.class);
         startActivity(intent);*/
 
@@ -56,7 +56,7 @@ public class LogInActivity extends AppCompatActivity {
         if(user != null){ // user si auth
             LogedInUser logedInUser = LogedInUser.getInstance(user.getUid(), user.getEmail(), user.getDisplayName());
             CloudFirestoreRepository repo = CloudFirestoreRepository.create();
-            repo.addUser(new UserModel(logedInUser));
+            repo.addOnlineUser(new UserModel(logedInUser));
             repo.onUserLogedIn();
             Log.d(TAG, "Login success");
             Intent intent = new Intent(LogInActivity.this, MainActivity.class);
@@ -66,4 +66,9 @@ public class LogInActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onDestroy() {
+        CloudFirestoreRepository.create().onUserSignOut(new UserModel(LogedInUser.getInstance()));
+        super.onDestroy();
+    }
 }

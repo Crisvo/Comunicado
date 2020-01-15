@@ -31,8 +31,8 @@ public class SignupActivity extends AppCompatActivity {
 
     public void onSignUp(View view){
         if(mViewModel.onSignUp()){
-            finish();
             this.onBackPressed();
+            finish();
         }else{
             // Show error.
         }

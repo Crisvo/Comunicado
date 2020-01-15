@@ -1,4 +1,4 @@
-package ro.atm.proiectretele.utils.webrtc;
+package ro.atm.proiectretele.utils.webrtc.pojo;
 
 import retrofit2.Call;
 import retrofit2.http.Header;

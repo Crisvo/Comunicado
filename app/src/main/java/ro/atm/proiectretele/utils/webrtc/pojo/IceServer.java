@@ -1,5 +1,5 @@
 
-package ro.atm.proiectretele.utils.webrtc;
+package ro.atm.proiectretele.utils.webrtc.pojo;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;

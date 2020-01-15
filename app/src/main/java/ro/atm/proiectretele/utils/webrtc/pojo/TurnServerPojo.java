@@ -1,10 +1,12 @@
 
-package ro.atm.proiectretele.utils.webrtc;
+package ro.atm.proiectretele.utils.webrtc.pojo;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
 import java.util.List;
+
+import ro.atm.proiectretele.utils.webrtc.pojo.IceServer;
 
 public class TurnServerPojo {
 

@@ -31,12 +31,12 @@ import ro.atm.proiectretele.adapters.MessagesAdapter;
 import ro.atm.proiectretele.adapters.UserAdapter;
 import ro.atm.proiectretele.data.CloudFirestoreRepository;
 import ro.atm.proiectretele.data.firestore_models.MessageModel;
+import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityMessengerBinding;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
 
 public class MessengerActivity extends AppCompatActivity {
     private ActivityMessengerBinding binding;
-    private FirebaseFirestore db = FirebaseFirestore.getInstance();
 
     private MessagesAdapter mAdapter;
     private String senderEmail;
@@ -62,11 +62,18 @@ public class MessengerActivity extends AppCompatActivity {
             senderEmail = (String) savedInstanceState.getSerializable("init");
         }
 
-        List<String> list = new LinkedList<>();
-        list.add(senderEmail);
-        list.add(LogedInUser.getInstance().getEmail());
+        // create inbox reference
+        String logedInEmail = LogedInUser.getInstance().getEmail();
+        String refName = "";
+        if(logedInEmail.compareTo(senderEmail) > 0){ //logged > sender
+            refName = senderEmail + logedInEmail;
+        }else{ //<
+            refName = logedInEmail + senderEmail;
+        }
 
-        Query query = inboxRef.orderBy("timestamp", Query.Direction.ASCENDING).whereIn("from", list);
+        inboxRef = FirebaseFirestore.getInstance().collection(refName);
+
+        Query query = inboxRef.orderBy("timestamp", Query.Direction.ASCENDING);
 
         FirestoreRecyclerOptions<MessageModel> options = new FirestoreRecyclerOptions.Builder<MessageModel>()
                 .setQuery(query, MessageModel.class)
@@ -96,16 +103,24 @@ public class MessengerActivity extends AppCompatActivity {
         MessageModel message = new MessageModel(LogedInUser.getInstance().getEmail(), binding.activityMessengerMessage.getText().toString());
         Map<String, Object> map = new HashMap<>();
         map.put("from", message.getFrom());
+        map.put("to", senderEmail);
         map.put("message", message.getMessage());
-        Long tsLong = System.currentTimeMillis()/1000;
+        Long tsLong = System.currentTimeMillis() / 1000;
         String ts = tsLong.toString();
         map.put("timestamp", ts);
-        FirebaseFirestore.getInstance().collection(senderEmail).add(map)
+        /*FirebaseFirestore.getInstance().collection(senderEmail).add(map)
                 .addOnSuccessListener(documentReference -> Toast.makeText(MessengerActivity.this, "Message send", Toast.LENGTH_SHORT).show())
                 .addOnFailureListener(e -> Toast.makeText(MessengerActivity.this, "Message not send", Toast.LENGTH_SHORT).show());
-        FirebaseFirestore.getInstance().collection(LogedInUser.getInstance().getEmail()).add(map);
+        FirebaseFirestore.getInstance().collection(LogedInUser.getInstance().getEmail()).add(map);*/
+
+        inboxRef.add(map);
 
         binding.activityMessengerMessage.setText("");
     }
 
+    @Override
+    protected void onDestroy() {
+        //CloudFirestoreRepository.create().onUserSignOut(new UserModel(LogedInUser.getInstance()));
+        super.onDestroy();
+    }
 }

@@ -38,7 +38,7 @@ public class CloudFirestoreRepository {
 
     //// METHODS
 
-    public void addUser(UserModel userModel) {
+    public void addOnlineUser(UserModel userModel) {
         database.collection(Constants.COLLECTION_ONLINE_USERS).document(userModel.getUid()).set(userModel)
                 .addOnSuccessListener(aVoid -> Log.d(TAG, "Online userModel added successfully!"))
                 .addOnFailureListener(e -> Log.d(TAG, "Failed to add online userModel!"));

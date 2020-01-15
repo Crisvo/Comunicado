@@ -1,7 +1,6 @@
 package ro.atm.proiectretele.view.activities;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
 import androidx.lifecycle.ViewModelProviders;
@@ -49,16 +48,18 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import ro.atm.proiectretele.R;
+import ro.atm.proiectretele.data.CloudFirestoreRepository;
 import ro.atm.proiectretele.data.Constants;
+import ro.atm.proiectretele.data.firestore_models.UserModel;
 import ro.atm.proiectretele.databinding.ActivityMediaStreamBinding;
 import ro.atm.proiectretele.utils.app.constant.Constants_Permissions;
 import ro.atm.proiectretele.utils.app.login.LogedInUser;
 import ro.atm.proiectretele.utils.webrtc.CustomPeerConnectionObserver;
-import ro.atm.proiectretele.utils.webrtc.IceServer;
-import ro.atm.proiectretele.utils.webrtc.SignallingClientSocket;
-import ro.atm.proiectretele.utils.webrtc.SignallingInterface;
+import ro.atm.proiectretele.utils.webrtc.pojo.IceServer;
+import ro.atm.proiectretele.utils.webrtc.signaling.SignallingClientSocket;
+import ro.atm.proiectretele.utils.webrtc.signaling.SignallingInterface;
 import ro.atm.proiectretele.utils.webrtc.SimpleSdpObserver;
-import ro.atm.proiectretele.utils.webrtc.TurnServerPojo;
+import ro.atm.proiectretele.utils.webrtc.pojo.TurnServerPojo;
 import ro.atm.proiectretele.utils.webrtc.Utils;
 import ro.atm.proiectretele.utils.webrtc.VideoTransmissionParameters;
 import ro.atm.proiectretele.viewmodel.MediaStreamViewModel;
@@ -97,6 +98,7 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
 
         super.onBackPressed();
     }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -576,6 +578,9 @@ public class MediaStreamActivity extends AppCompatActivity implements EasyPermis
     @Override
     protected void onDestroy() {
         SignallingClientSocket.getInstance().close();
+
+        CloudFirestoreRepository.create().onUserSignOut(new UserModel(LogedInUser.getInstance()));
+
         super.onDestroy();
     }
 }

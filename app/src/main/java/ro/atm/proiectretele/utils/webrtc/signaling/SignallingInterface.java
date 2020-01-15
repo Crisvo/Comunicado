@@ -1,4 +1,4 @@
-package ro.atm.proiectretele.utils.webrtc;
+package ro.atm.proiectretele.utils.webrtc.signaling;
 
 import org.json.JSONObject;
 
